@@ -38,7 +38,7 @@ jobs:
           SHEET_NAME: 'シート1(GAS連携中)'
           SERVICE_ACCOUNT_FILE: 'service_account.json'
         run: |
-          python tracker.py
+          python operations/tracker.py
       - name: Clean up credential file
         if: always()
         run: |

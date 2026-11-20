@@ -287,6 +287,7 @@ def process_single_ticker(item):
 # =========================================================
 # 3. メイン処理
 # =========================================================
+import datetime
 import os
 from core.loader import load_watchlist
 
@@ -338,8 +339,9 @@ if __name__ == '__main__':
     # -------------------------------------------------------------
     # 2つのCSVファイルに分けて出力
     # -------------------------------------------------------------
-    summary_filename = OUTPUT_DIR / 'jpx400_supertrend_results.csv'
-    all_trades_filename = OUTPUT_DIR / 'jpx400_supertrend_all_trades.csv'
+    now_str = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    summary_filename = OUTPUT_DIR / f'{now_str}_jpx400_supertrend_results.csv'
+    all_trades_filename = OUTPUT_DIR / f'{now_str}_jpx400_supertrend_all_trades.csv'
 
     # 1. 銘柄別サマリー結果を出力
     df_summary.to_csv(summary_filename, index=False, encoding='utf-8-sig')

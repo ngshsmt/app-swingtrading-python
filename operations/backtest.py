@@ -8,7 +8,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yfinance as yf
-!pip install backtesting
 from backtesting import Backtest, Strategy
 
 # リポジトリのルート階層をパスに追加（operations/ 配下から core/ を import するため）
@@ -25,9 +24,11 @@ warnings.filterwarnings('ignore', category=UserWarning)
 # 1. Backtesting.py 用 Strategy クラス
 # =========================================================
 class CustomSignalStrategy(Strategy):
+    mode = "short_only"  # 空売り単独検証用 ("short_only", "long_only", "both")
+
     def init(self):
         # 共通ストラテジーモジュールで指標計算＆シグナル判定を実行
-        df_with_signals = generate_signals(self.data.df)
+        df_with_signals = generate_signals(self.data.df, mode=self.mode)
 
         # Backtesting.py の self.I() 用に数値コードへ変換
         #  1: Long (買いエントリー)
@@ -89,6 +90,9 @@ def process_single_ticker(item):
             df = ticker.history(start=start_date, end=end_date, auto_adjust=True)
         else:
             df = ticker.history(period=period, auto_adjust=True)
+
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
 
         # データ取得失敗または件数不足のチェック
         if df.empty or len(df) < 60:
@@ -284,23 +288,12 @@ def process_single_ticker(item):
 # 3. メイン処理
 # =========================================================
 import os
-from google.colab import drive
-
-# 1. Google ドライブをマウント（認証画面が出たら許可してください）
-drive.mount('/content/drive')
-
-# 2. CSVファイルやPythonスクリプトを置いているGoogleドライブのフォルダパスを指定
-# ※ ご自身のフォルダ構成に合わせてパスを変更してください
-# 例: マイドライブ直下の "backtest" フォルダにある場合
-MY_FOLDER_PATH = '/content/drive/MyDrive/トレード/backtesting_since_20260830'
-
-# 作業ディレクトリを指定したフォルダに変更
-os.chdir(MY_FOLDER_PATH)
-
-print("現在の作業フォルダ:", os.getcwd())
+from core.loader import load_watchlist
 
 if __name__ == '__main__':
-    MASTER_CSV_PATH = 'jpx400_list.csv'
+    WATCHLIST_PATH = ROOT_DIR / "data" / "watchlist_jpx400.csv"
+    OUTPUT_DIR = Path("/Users/natsuikeigo/app-swingtrading-python/outputs")
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # 取得期間の設定
     # 変動させたい場合 FETCH_PERIOD = "5y"←直近5年を見る場合, START_DATE = None, END_DATE = None
@@ -309,16 +302,17 @@ if __name__ == '__main__':
     START_DATE = "2021-09-01"
     END_DATE = "2026-09-01"
 
-    master_df = pd.read_csv(MASTER_CSV_PATH, header=0, usecols=[0, 1])
-    master_df.columns = ['Code', 'CompanyName']
+    codes = load_watchlist(WATCHLIST_PATH)
 
     tasks = [
-        (row['Code'], row['CompanyName'], FETCH_PERIOD, START_DATE, END_DATE)
-        for _, row in master_df.iterrows()
+        (code, str(code), FETCH_PERIOD, START_DATE, END_DATE)
+        for code in codes
     ]
 
     print(f"銘柄マスタから {len(tasks)} 件の銘柄を読み込みました。")
-    print("yfinance経由で株価データの取得とバックテストを並列で実行します...")
+    period_info = f"{START_DATE} 〜 {END_DATE}" if START_DATE and END_DATE else f"FETCH_PERIOD={FETCH_PERIOD}"
+    print(f"バックテスト期間: {period_info}")
+    print("yfinance経由で株価データの取得とバックテスト（Short Only）を並列で実行します...")
 
     summary_results = []
     all_trades_list = []
@@ -338,13 +332,14 @@ if __name__ == '__main__':
 
     # プレビュー表示
     print("\n--- バックテスト結果サマリー（上位10件） ---")
-    print(df_summary.head(10))
+    if not df_summary.empty:
+        print(df_summary.head(10))
 
     # -------------------------------------------------------------
     # 2つのCSVファイルに分けて出力
     # -------------------------------------------------------------
-    summary_filename = 'jpx400_supertrend_results.csv'
-    all_trades_filename = 'jpx400_supertrend_all_trades.csv'
+    summary_filename = OUTPUT_DIR / 'jpx400_supertrend_results.csv'
+    all_trades_filename = OUTPUT_DIR / 'jpx400_supertrend_all_trades.csv'
 
     # 1. 銘柄別サマリー結果を出力
     df_summary.to_csv(summary_filename, index=False, encoding='utf-8-sig')

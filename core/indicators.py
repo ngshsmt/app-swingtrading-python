@@ -24,6 +24,20 @@ def calculate_rma(series: pd.Series, period: int) -> pd.Series:
     return pd.Series(rma, index=series.index)
 
 
+def calculate_atr(df: pd.DataFrame, period: int = 10) -> pd.Series:
+    """TradingView互換のATR（True RangeのRMA）を計算する"""
+    high = df["High"]
+    low = df["Low"]
+    close = df["Close"]
+
+    tr1 = high - low
+    tr2 = (high - close.shift(1)).abs()
+    tr3 = (low - close.shift(1)).abs()
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+
+    return calculate_rma(tr, period)
+
+
 def calculate_supertrend(
     df: pd.DataFrame, period: int = 10, multiplier: float = 3.0
 ) -> tuple[pd.Series, pd.Series]:
@@ -35,14 +49,7 @@ def calculate_supertrend(
     low = df["Low"]
     close = df["Close"]
 
-    # True Range の計算
-    tr1 = high - low
-    tr2 = (high - close.shift(1)).abs()
-    tr3 = (low - close.shift(1)).abs()
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-
-    # RMAによるATR計算
-    atr = calculate_rma(tr, period)
+    atr = calculate_atr(df, period)
 
     hl2 = (high + low) / 2
     basic_ub = hl2 + (multiplier * atr)
@@ -102,4 +109,5 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["ST_Direction"], df["ST_Value"] = calculate_supertrend(
         df, period=10, multiplier=3.0
     )
+    df["ATR"] = calculate_atr(df, period=10)
     return df

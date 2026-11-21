@@ -6,6 +6,7 @@ from core.strategies.generate_signals import generate_signals
 
 STRATEGIES = {
     "strategy_no1": strategy_no1.evaluate_conditions,
+    "strategy_no2": strategy_no2.evaluate_conditions,
 }
 
 

@@ -333,7 +333,7 @@ if __name__ == '__main__':
 
     # ProcessPoolExecutor による並列処理
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        for res in executor.map(process_single_ticker, tasks, chunksize=7):
+        for res in executor.map(process_single_ticker, tasks, chunksize=5):
             if res is not None:
                 summary_res, trades_df = res
                 summary_results.append(summary_res)

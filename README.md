@@ -1,4 +1,5 @@
 # リポジトリのルート階層
+```
 ├── core/                         ◀ 【頭脳】ロジックと共通読み込み処理
 │   ├── __init__.py               (空ファイル)
 │   ├── indicators.py             ・Supertrend, SMA計算（共通利用・変更なし）
@@ -20,5 +21,6 @@
 │   └── app.py                    ・ダッシュボード（変更なし）
 │
 └── .github/workflows/            ◀ GitHub Actions設定
+```
 
 ---

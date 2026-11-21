@@ -1,63 +1,16 @@
-# strategy.py
+# `core/strategies/strategy_no1.py`などの売買条件の評価とシグナル生成を分離するために、`generate_signals`関数を定義する。
 
+from typing import Callable
 import numpy as np
 import pandas as pd
-from core.indicators import add_indicators
 
 
-def evaluate_conditions(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    テクニカル指標を付与し、各日の売買条件（ブール値フラグ）を計算する。
-    """
-    df = add_indicators(df)
-    close = df["Close"]
-
-    # Supertrend 方向判定 (-1: Buy, 1: Sell)
-    df["isStBuy"] = df["ST_Direction"] == -1
-    df["isStSell"] = df["ST_Direction"] == 1
-
-    # パーフェクトオーダー条件（買い）
-    df["isSimplePO"] = (
-        (df["SMA5"] > df["SMA10"])
-        & (df["SMA10"] > df["SMA20"])
-        & (close > df["SMA50"])
-    )
-
-    # 転換・クロス条件（買い）
-    df["st_turn_buy"] = (df["ST_Direction"].shift(1) == 1) & (df["ST_Direction"] == -1)
-    df["sma_cross_buy"] = (df["SMA5"].shift(1) <= df["SMA10"].shift(1)) & (
-        df["SMA5"] > df["SMA10"]
-    )
-
-    # 買いエントリー / 手仕舞い条件
-    df["longEntryCond"] = (
-        df["isStBuy"] & df["isSimplePO"] & (df["st_turn_buy"] | df["sma_cross_buy"])
-    )
-    df["longExitCond"] = (df["SMA5"] < df["SMA20"]) | (~df["isStBuy"])
-
-    # 逆パーフェクトオーダー条件（空売り）
-    df["isSimpleInversePO"] = (
-        (df["SMA5"] < df["SMA10"])
-        & (df["SMA10"] < df["SMA20"])
-        & (close < df["SMA50"])
-    )
-
-    # 転換・クロス条件（空売り）
-    df["st_turn_sell"] = (df["ST_Direction"].shift(1) == -1) & (df["ST_Direction"] == 1)
-    df["sma_cross_sell"] = (df["SMA5"].shift(1) >= df["SMA10"].shift(1)) & (
-        df["SMA5"] < df["SMA10"]
-    )
-
-    # 空売りエントリー / 手仕舞い条件（ベースライン：完全ミラー）
-    df["shortEntryCond"] = (
-        df["isStSell"]
-        & df["isSimpleInversePO"]
-        & (df["st_turn_sell"] | df["sma_cross_sell"])
-    )
-    df["shortExitCond"] = (df["SMA5"] > df["SMA20"]) | (~df["isStSell"])
-
-    return df
-
+def generate_signals(
+    df: pd.DataFrame,
+    evaluate_fn: Callable[[pd.DataFrame], pd.DataFrame],
+    mode: str = "both",
+) -> pd.DataFrame:
+    df = evaluate_fn(df)
 
 def generate_signals(df: pd.DataFrame, mode: str = "both") -> pd.DataFrame:
     """

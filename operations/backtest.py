@@ -293,7 +293,7 @@ from core.loader import load_watchlist
 
 if __name__ == '__main__':
     WATCHLIST_PATH = ROOT_DIR / "data" / "watchlist_jpx400.csv"
-    OUTPUT_DIR = Path("/Users/natsuikeigo/app-swingtrading-python/outputs")
+    OUTPUT_DIR = Path("aaa")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # 取得期間の設定

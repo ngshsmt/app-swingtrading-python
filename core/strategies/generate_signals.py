@@ -1,4 +1,4 @@
-# `core/strategies/strategy_no1.py`などの売買条件の評価とシグナル生成を分離するために、`generate_signals`関数を定義する。
+# `core/strategies/strategy_no1.py`などの売買条件の評価からシグナル生成を分離し、`generate_signals`関数を定義する。
 
 from typing import Callable
 import numpy as np

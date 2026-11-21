@@ -10,6 +10,8 @@ import pandas as pd
 import yfinance as yf
 from backtesting import Backtest, Strategy
 
+SAVE_PATH = os.environ.get("SAVE_PATH")
+
 # リポジトリのルート階層をパスに追加（operations/ 配下から core/ を import するため）
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
@@ -293,7 +295,7 @@ from core.loader import load_watchlist
 
 if __name__ == '__main__':
     WATCHLIST_PATH = ROOT_DIR / "data" / "watchlist_jpx400.csv"
-    OUTPUT_DIR = Path("aaa")
+    OUTPUT_DIR = Path("SAVE_PATH")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # 取得期間の設定

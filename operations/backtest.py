@@ -319,7 +319,7 @@ if __name__ == '__main__':
     codes = load_watchlist(WATCHLIST_PATH)
 
     tasks = [
-        (code, str(code), FETCH_PERIOD, START_DATE, END_DATE)
+        (code, str(code), FETCH_PERIOD, START_DATE, END_DATE, args.strategy, args.mode)
         for code in codes
     ]
 

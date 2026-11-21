@@ -12,14 +12,20 @@ def generate_signals(
 ) -> pd.DataFrame:
     df = evaluate_fn(df)
 
-def generate_signals(df: pd.DataFrame, mode: str = "both") -> pd.DataFrame:
+from typing import Callable
+
+def generate_signals(
+    df: pd.DataFrame,
+    evaluate_fn: Callable[[pd.DataFrame], pd.DataFrame],
+    mode: str = "both",
+) -> pd.DataFrame:
+    df = evaluate_fn(df)
     """
     3値状態管理（simPosition: 0=ノーポジ, 1=買い, -1=空売り）とドテン対応により、
     時系列のポジション推移と発生シグナル（Long / Exit L / Short / Exit S）を算出する。
     TradingViewインジケーター (Signal & Alert Indicator_v1.0.0) と完全互換。
     mode: "both" (両方向), "long_only" (買いのみ), "short_only" (空売りのみ)
     """
-    df = evaluate_conditions(df)
 
     n = len(df)
     positions = np.zeros(n, dtype=int)

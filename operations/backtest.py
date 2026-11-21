@@ -1,5 +1,6 @@
 # backtest.py_v5
 
+import os
 import concurrent.futures
 import sys
 import warnings
@@ -33,7 +34,7 @@ class CustomSignalStrategy(Strategy):
     def init(self):
         df_with_signals = run_strategy(self.data.df, strategy_name=self.strategy_name, mode=self.mode)
         # 共通ストラテジーモジュールで指標計算＆シグナル判定を実行
-        df_with_signals = generate_signals(self.data.df, mode=self.mode)
+        df_with_signals = run_strategy(self.data.df, strategy_name=self.strategy_name, mode=self.mode)
 
         # Backtesting.py の self.I() 用に数値コードへ変換
         #  1: Long (買いエントリー)

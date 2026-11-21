@@ -17,7 +17,8 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from core.strategy import generate_signals
+import argparse
+from core.strategies import STRATEGIES, run_strategy
 
 warnings.filterwarnings('ignore', category=UserWarning)
 
@@ -26,9 +27,11 @@ warnings.filterwarnings('ignore', category=UserWarning)
 # 1. Backtesting.py 用 Strategy クラス
 # =========================================================
 class CustomSignalStrategy(Strategy):
-    mode = "short_only"  # 空売り単独検証用 ("short_only", "long_only", "both")
+    strategy_name = "strategy_no1"
+    mode = "short_only" # 空売り単独検証用 ("short_only", "long_only", "both")
 
     def init(self):
+        df_with_signals = run_strategy(self.data.df, strategy_name=self.strategy_name, mode=self.mode)
         # 共通ストラテジーモジュールで指標計算＆シグナル判定を実行
         df_with_signals = generate_signals(self.data.df, mode=self.mode)
 
@@ -80,7 +83,7 @@ def process_single_ticker(item):
     yfinance経由で株価データを取得し、バックテストを実行
     item: tuple (code, company_name, period, start_date, end_date)
     """
-    code, company_name, period, start_date, end_date = item
+    code, company_name, period, start_date, end_date, strategy_name, mode = item
     
     # 日本株対応用ティッカーシンボル (例: 1662 -> 1662.T)
     ticker_symbol = f"{code}.T" if not str(code).endswith('.T') else str(code)
@@ -116,6 +119,8 @@ def process_single_ticker(item):
             return None
 
         # バックテスト実行（元本は"cash"。デフォルトは100万円）
+        CustomSignalStrategy.strategy_name = strategy_name
+        CustomSignalStrategy.mode = mode
         bt = Backtest(df, CustomSignalStrategy, cash=1_000_000, commission=0, finalize_trades=True)
         stats = bt.run()
         trades = stats['_trades'].copy()
@@ -294,6 +299,11 @@ import os
 from core.loader import load_watchlist
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--strategy", default="strategy_no1", choices=list(STRATEGIES.keys()))
+    parser.add_argument("--mode", default="short_only", choices=["both", "long_only", "short_only"])
+    args = parser.parse_args()
+
     WATCHLIST_PATH = ROOT_DIR / "data" / "watchlist_jpx400.csv"
     OUTPUT_DIR = Path("SAVE_PATH")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -342,8 +352,8 @@ if __name__ == '__main__':
     # 2つのCSVファイルに分けて出力
     # -------------------------------------------------------------
     now_str = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    summary_filename = OUTPUT_DIR / f'{now_str}_jpx400_supertrend_results.csv'
-    all_trades_filename = OUTPUT_DIR / f'{now_str}_jpx400_supertrend_all_trades.csv'
+    summary_filename = OUTPUT_DIR / f'{now_str}_jpx400_{args.strategy}_{args.mode}_results.csv'
+    all_trades_filename = OUTPUT_DIR / f'{now_str}_jpx400_{args.strategy}_{args.mode}_all_trades.csv'
 
     # 1. 銘柄別サマリー結果を出力
     df_summary.to_csv(summary_filename, index=False, encoding='utf-8-sig')

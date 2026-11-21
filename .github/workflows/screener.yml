@@ -42,5 +42,8 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
+          SAVE_PATH: ${{ secrets.SAVE_PATH }}
+          STRATEGY_NAME: strategy_no1
+          STRATEGY_MODE: both   # long_only, short_only, both
         run: |
           python operations/screener.py

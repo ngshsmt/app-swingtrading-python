@@ -18,7 +18,11 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from core.loader import load_watchlist
-from core.strategy import generate_signals
+import argparse
+from core.strategies import STRATEGIES, run_strategy
+
+STRATEGY_NAME = os.environ.get("STRATEGY_NAME", "strategy_no1")
+STRATEGY_MODE = os.environ.get("STRATEGY_MODE", "both")
 
 # ==========================================
 # 1. 環境変数・設定値の読み込み
@@ -90,7 +94,7 @@ def analyze_ticker(ticker_symbol: str) -> dict | None:
             return None
 
         # 共通ストラテジーモジュールで指標計算＆シグナル判定を実行
-        df = generate_signals(df)
+        df = run_strategy(df, strategy_name=STRATEGY_NAME, mode=STRATEGY_MODE)
         latest = df.iloc[-1]
 
         code = ticker_symbol.replace(".T", "")
@@ -255,4 +259,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--strategy", default=STRATEGY_NAME, choices=list(STRATEGIES.keys()))
+    parser.add_argument("--mode", default=STRATEGY_MODE, choices=["both", "long_only", "short_only"])
+    args = parser.parse_args()
+    STRATEGY_NAME = args.strategy
+    STRATEGY_MODE = args.mode
     main()

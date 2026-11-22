@@ -1,3 +1,6 @@
+# `operations/strategies.py`
+* 新しいストラテジを実装する際にトレイリングストップを使う場合は `shortSL` / `shortRisk1R`（買いは `longSL` / `longRisk1R`）のカラム名で定義すること
+
 # `operations/app.py`（銘柄選定評価ダッシュボード / Streamlit）
 
 ## 1. 役割と境界線（単一責任）

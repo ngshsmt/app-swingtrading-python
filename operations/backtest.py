@@ -206,29 +206,37 @@ def process_single_ticker(item):
                 'テスト対象開始日': start_str,
                 'テスト対象終了日': end_str,
                 'トレード回数': 0,
-                '勝率[%]': 0.0,
-                '平均利益[%]': 0.0,
-                '平均損失[%]': 0.0,
+                '勝率': 0.0,
+                '平均利益': 0.0,
+                '平均損失': 0.0,
                 'リスクリワード': np.nan,
                 'プロフィットファクター': np.nan,
-                '最大ドローダウン[%]': 0.0,
+                '最大ドローダウン': 0.0,
                 '最大連敗数': 0,
                 '平均含み益保有日数': 0.0,
-                '平均含み損保有日数': 0.0
+                '平均含み損保有日数': 0.0,
+                '1R到達率': 0.0,
+                '2R到達率': 0.0
             }
             return summary_res, pd.DataFrame()
 
         # -------------------------------------------------------------
-        # 機能①・②：含み益日数・含み損日数の計算
+        # 機能①・②：含み益日数・含み損日数 ＆ 最大到達Rの計算
         # -------------------------------------------------------------
+        df_sig = run_strategy(df, strategy_name=strategy_name, mode=mode)
+        has_long_r = 'longRisk1R' in df_sig.columns
+        has_short_r = 'shortRisk1R' in df_sig.columns
+
         unrealized_profit_days = []
         unrealized_loss_days = []
+        max_reached_r_list = []
 
         for _, trade in trades.iterrows():
             entry_time = trade['EntryTime']
             exit_time = trade['ExitTime']
             entry_price = trade['EntryPrice']
             is_long = trade['Size'] > 0
+            entry_bar = int(trade['EntryBar'])
 
             # エントリーから手仕舞いまでの日次株価データを抽出
             trade_df = df.loc[entry_time:exit_time]
@@ -243,6 +251,26 @@ def process_single_ticker(item):
             unrealized_profit_days.append(int(profit_mask.sum()))
             unrealized_loss_days.append(int(loss_mask.sum()))
 
+            # 最大到達R（パターンB: 0, 1, 2, 3...）の算出
+            # Backtesting.py はシグナル発生バーの翌バー始値で約定するため、シグナル発生バー(entry_bar - 1)の1R幅を参照
+            sig_idx = max(0, entry_bar - 1)
+            r_unit = np.nan
+            if is_long and has_long_r:
+                r_unit = df_sig['longRisk1R'].iloc[sig_idx]
+            elif (not is_long) and has_short_r:
+                r_unit = df_sig['shortRisk1R'].iloc[sig_idx]
+
+            if pd.notnull(r_unit) and r_unit > 0 and not trade_df.empty:
+                if is_long:
+                    max_favorable_move = float(trade_df['High'].max()) - entry_price
+                else:
+                    max_favorable_move = entry_price - float(trade_df['Low'].min())
+                reached_r = max(0, int(np.floor(max_favorable_move / float(r_unit))))
+            else:
+                reached_r = 0
+
+            max_reached_r_list.append(reached_r)
+
         # -------------------------------------------------------------
         # 全トレード詳細データの整形と追加カラムの作成
         # -------------------------------------------------------------
@@ -254,7 +282,7 @@ def process_single_ticker(item):
             if col in trades.columns:
                 trades[col] = pd.to_datetime(trades[col]).dt.strftime('%Y-%m-%d %H:%M')
 
-        # 3. 損益率の小数点以下4桁に丸める（存在する場合のみ）
+        # 3. 損益率を小数点以下4桁で丸める
         if 'ReturnPct' in trades.columns:
             trades['ReturnPct'] = (trades['ReturnPct'] ).round(4)
 
@@ -263,13 +291,12 @@ def process_single_ticker(item):
         trades['会社名'] = company_name
         trades['含み益保有日数'] = unrealized_profit_days
         trades['含み損保有日数'] = unrealized_loss_days
+        trades['最大到達R'] = max_reached_r_list
 
         rename_dict = {
             'Size': '取引株数',
             'EntryPrice': '新規建価格',
             'ExitPrice': '決済価格',
-            'SL': '損切り価格',
-            'TP': '利確価格',
             'PnL': '損益金額',
             'ReturnPct': '損益率',
             'Commission': '手数料',
@@ -279,15 +306,13 @@ def process_single_ticker(item):
         }
         trades = trades.rename(columns=rename_dict)
 
-        # 5. 指定された順番でのカラムの並べ替え（不要な列は除外）
+        # 5. 指定された順番でのカラムの並べ替え（損切り価格・利確価格は削除して左に詰める）
         desired_columns = [
             'コード',
             '会社名',
             '取引株数',
             '新規建価格',
             '決済価格',
-            '損切り価格',
-            '利確価格',
             '損益金額',
             '損益率',
             '手数料',
@@ -296,33 +321,35 @@ def process_single_ticker(item):
             'バーの本数',
             '保有期間',
             '含み益保有日数',
-            '含み損保有日数'
+            '含み損保有日数',
+            '最大到達R'
         ]
 
         existing_cols = [c for c in desired_columns if c in trades.columns]
         trades = trades[existing_cols]
 
         # -------------------------------------------------------------
-        # サマリー指標の集計（win_rateを最初に定義）
+        # サマリー指標の集計
         # -------------------------------------------------------------
-        win_rate = float(stats['Win Rate [%]']) if pd.notnull(stats['Win Rate [%]']) else 0.0
+        raw_win_rate = float(stats['Win Rate [%]']) / 100.0 if pd.notnull(stats['Win Rate [%]']) else 0.0
 
-        # 平均利益・平均損失の計算
-        winning_returns = trades['損益率'][trades['損益率'] > 0]
-        losing_returns = trades['損益率'][trades['損益率'] < 0]
+        # 平均利益・平均損失の計算（元のReturnPct小数ベース）
+        raw_returns = stats['_trades']['ReturnPct']
+        winning_returns = raw_returns[raw_returns > 0]
+        losing_returns = raw_returns[raw_returns < 0]
 
-        avg_gain_pct = float(winning_returns.mean()) if len(winning_returns) > 0 else 0.0
-        avg_loss_pct = float(abs(losing_returns.mean())) if len(losing_returns) > 0 else 0.0
+        avg_gain = float(winning_returns.mean()) if len(winning_returns) > 0 else 0.0
+        avg_loss = float(abs(losing_returns.mean())) if len(losing_returns) > 0 else 0.0
 
-        if avg_loss_pct > 0:
-            risk_reward = avg_gain_pct / avg_loss_pct
+        if avg_loss > 0:
+            risk_reward = avg_gain / avg_loss
         else:
-            risk_reward = np.nan if avg_gain_pct == 0 else np.inf
+            risk_reward = np.nan if avg_gain == 0 else np.inf
 
         pf = float(stats['Profit Factor']) if pd.notnull(stats['Profit Factor']) else np.nan
 
-        # ドローダウン(%) & 最大連敗数
-        max_dd_pct = float(stats['Max. Drawdown [%]']) if pd.notnull(stats['Max. Drawdown [%]']) else 0.0
+        # ドローダウン(小数) & 最大連敗数
+        raw_max_dd = float(stats['Max. Drawdown [%]']) / 100.0 if pd.notnull(stats['Max. Drawdown [%]']) else 0.0
 
         is_loss = stats['_trades']['PnL'] < 0
         max_losing_streak = 0
@@ -335,21 +362,28 @@ def process_single_ticker(item):
             else:
                 current_streak = 0
 
+        # 1R到達率・2R到達率の集計（小数表記、未定義時は0.0）
+        reached_r_arr = np.array(max_reached_r_list, dtype=int)
+        rate_1r = float(np.mean(reached_r_arr >= 1)) if len(reached_r_arr) > 0 else 0.0
+        rate_2r = float(np.mean(reached_r_arr >= 2)) if len(reached_r_arr) > 0 else 0.0
+
         summary_res = {
             'コード': code,
             '会社名': company_name,
             'テスト対象開始日': start_str,
             'テスト対象終了日': end_str,
             'トレード回数': num_trades,
-            '勝率[%]': round(win_rate, 2),
-            '平均利益[%]': round(avg_gain_pct, 2),
-            '平均損失[%]': round(avg_loss_pct, 2),
+            '勝率': round(raw_win_rate, 4),
+            '平均利益': round(avg_gain, 4),
+            '平均損失': round(avg_loss, 4),
             'リスクリワード': round(risk_reward, 2) if np.isfinite(risk_reward) else risk_reward,
             'プロフィットファクター': round(pf, 2) if pd.notnull(pf) else pf,
-            '最大ドローダウン[%]': round(abs(max_dd_pct), 2),
+            '最大ドローダウン': round(abs(raw_max_dd), 4),
             '最大連敗数': max_losing_streak,
             '平均含み益保有日数': round(float(np.mean(unrealized_profit_days)), 2),
-            '平均含み損保有日数': round(float(np.mean(unrealized_loss_days)), 2)
+            '平均含み損保有日数': round(float(np.mean(unrealized_loss_days)), 2),
+            '1R到達率': round(rate_1r, 4),
+            '2R到達率': round(rate_2r, 4)
         }
 
         # (サマリー結果, 個別トレード詳細) のタプルで返す

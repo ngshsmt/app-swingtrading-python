@@ -32,7 +32,6 @@ class CustomSignalStrategy(Strategy):
     mode = "short_only" # 空売り単独検証用 ("short_only", "long_only", "both")
 
     def init(self):
-        df_with_signals = run_strategy(self.data.df, strategy_name=self.strategy_name, mode=self.mode)
         # 共通ストラテジーモジュールで指標計算＆シグナル判定を実行
         df_with_signals = run_strategy(self.data.df, strategy_name=self.strategy_name, mode=self.mode)
 
@@ -55,26 +54,95 @@ class CustomSignalStrategy(Strategy):
 
         self.signal = self.I(lambda: sig_code, name='Signal')
 
+        # トレイリングストップ用データの登録（ストラテジ側に定義がある場合のみ有効化）
+        n = len(df_with_signals)
+        long_sl = df_with_signals['longSL'].to_numpy(dtype=float) if 'longSL' in df_with_signals.columns else np.full(n, np.nan)
+        long_r = df_with_signals['longRisk1R'].to_numpy(dtype=float) if 'longRisk1R' in df_with_signals.columns else np.full(n, np.nan)
+        short_sl = df_with_signals['shortSL'].to_numpy(dtype=float) if 'shortSL' in df_with_signals.columns else np.full(n, np.nan)
+        short_r = df_with_signals['shortRisk1R'].to_numpy(dtype=float) if 'shortRisk1R' in df_with_signals.columns else np.full(n, np.nan)
+
+        self.long_sl_arr = self.I(lambda: long_sl, name='longSL')
+        self.long_r_arr = self.I(lambda: long_r, name='longRisk1R')
+        self.short_sl_arr = self.I(lambda: short_sl, name='shortSL')
+        self.short_r_arr = self.I(lambda: short_r, name='shortRisk1R')
+
+        # トレイリング状態管理変数
+        self._active_1r = np.nan
+        self._trail_phase = 0  # 0:初期SL, 1:1R到達(建値), 2:2R到達(+1Rロック)
+
+    def _reset_trailing_state(self, risk_1r: float):
+        if pd.notnull(risk_1r) and risk_1r > 0:
+            self._active_1r = float(risk_1r)
+        else:
+            self._active_1r = np.nan
+        self._trail_phase = 0
+
+    def _update_trailing_stop_for_next_bar(self):
+        """
+        当日の引け後判定：保有ポジションが1R・2Rに到達していれば、翌営業日から有効になるSLを更新する。
+        """
+        if not self.position or not self.trades or np.isnan(self._active_1r):
+            return
+
+        trade = self.trades[-1]
+        entry_price = trade.entry_price
+        r_unit = self._active_1r
+
+        if self.position.is_long:
+            max_gain = self.data.High[-1] - entry_price
+            if max_gain >= 2.0 * r_unit and self._trail_phase < 2:
+                self._trail_phase = 2
+                trade.sl = entry_price + r_unit
+            elif max_gain >= 1.0 * r_unit and self._trail_phase < 1:
+                self._trail_phase = 1
+                trade.sl = entry_price
+
+        elif self.position.is_short:
+            max_gain = entry_price - self.data.Low[-1]
+            if max_gain >= 2.0 * r_unit and self._trail_phase < 2:
+                self._trail_phase = 2
+                trade.sl = entry_price - r_unit
+            elif max_gain >= 1.0 * r_unit and self._trail_phase < 1:
+                self._trail_phase = 1
+                trade.sl = entry_price
+
     def next(self):
+        # 1. 既存ポジションの引け後トレイリングSL更新（翌バーから有効）
+        self._update_trailing_stop_for_next_bar()
+
         sig = self.signal[-1]
 
         if sig == 1 and not self.position:
-            self.buy()
+            sl_val = self.long_sl_arr[-1]
+            self.buy(sl=float(sl_val) if pd.notnull(sl_val) else None)
+            self._reset_trailing_state(self.long_r_arr[-1])
+
         elif sig == -1 and self.position.is_long:
             self.position.close()
+            self._reset_trailing_state(np.nan)
+
         elif sig == 2 and not self.position:
-            self.sell()
+            sl_val = self.short_sl_arr[-1]
+            self.sell(sl=float(sl_val) if pd.notnull(sl_val) else None)
+            self._reset_trailing_state(self.short_r_arr[-1])
+
         elif sig == -2 and self.position.is_short:
             self.position.close()
+            self._reset_trailing_state(np.nan)
+
         elif sig == -3:
             if self.position:
                 self.position.close()
-            self.sell()
+            sl_val = self.short_sl_arr[-1]
+            self.sell(sl=float(sl_val) if pd.notnull(sl_val) else None)
+            self._reset_trailing_state(self.short_r_arr[-1])
+
         elif sig == 3:
             if self.position:
                 self.position.close()
-            self.buy()
-
+            sl_val = self.long_sl_arr[-1]
+            self.buy(sl=float(sl_val) if pd.notnull(sl_val) else None)
+            self._reset_trailing_state(self.long_r_arr[-1])
 
 # =========================================================
 # 2. 1銘柄ごとのデータ取得 ＆ バックテストワーカー関数

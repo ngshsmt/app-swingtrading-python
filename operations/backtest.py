@@ -399,7 +399,7 @@ def process_single_ticker(item):
 # =========================================================
 import datetime
 import os
-from core.loader import load_watchlist
+from core.loader import load_watchlist_with_names
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -408,7 +408,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     WATCHLIST_PATH = ROOT_DIR / "data" / "watchlist_jpx400.csv"
-    OUTPUT_DIR = Path(SAVE_PATH) if SAVE_PATH else ROOT_DIR / "SAVE_PATH"
+    OUTPUT_DIR = Path(SAVE_PATH)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # 取得期間の設定
@@ -418,11 +418,11 @@ if __name__ == '__main__':
     START_DATE = "2021-09-01"
     END_DATE = "2026-09-01"
 
-    codes = load_watchlist(WATCHLIST_PATH)
+    watchlist_items = load_watchlist_with_names(WATCHLIST_PATH)
 
     tasks = [
-        (code, str(code), FETCH_PERIOD, START_DATE, END_DATE, args.strategy, args.mode)
-        for code in codes
+        (code, company_name, FETCH_PERIOD, START_DATE, END_DATE, args.strategy, args.mode)
+        for code, company_name in watchlist_items
     ]
 
     print(f"銘柄マスタから {len(tasks)} 件の銘柄を読み込みました。")
@@ -455,7 +455,7 @@ if __name__ == '__main__':
     # 2つのCSVファイルに分けて出力
     # -------------------------------------------------------------
     now_str = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    summary_filename = OUTPUT_DIR / f'{now_str}_jpx400_{args.strategy}_{args.mode}_results.csv'
+    summary_filename = OUTPUT_DIR / f'{now_str}_jpx400_{args.strategy}_{args.mode}_summary.csv'
     all_trades_filename = OUTPUT_DIR / f'{now_str}_jpx400_{args.strategy}_{args.mode}_all_trades.csv'
 
     # 1. 銘柄別サマリー結果を出力

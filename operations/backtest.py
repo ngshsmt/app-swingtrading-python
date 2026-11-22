@@ -256,7 +256,7 @@ def process_single_ticker(item):
 
         # 3. 損益率[%] の100倍換算
         if 'ReturnPct' in trades.columns:
-            trades['ReturnPct'] = (trades['ReturnPct'] * 100).round(2)
+            trades['ReturnPct'] = (trades['ReturnPct'] ).round(4)
 
         # 4. 追加項目の格納と既存列の日本語化
         trades['コード'] = code
@@ -271,7 +271,7 @@ def process_single_ticker(item):
             'SL': '損切り価格',
             'TP': '利確価格',
             'PnL': '損益金額',
-            'ReturnPct': '損益率[%]',
+            'ReturnPct': '損益率',
             'Commission': '手数料',
             'EntryTime': '新規建日時',
             'ExitTime': '決済日時',
@@ -289,7 +289,7 @@ def process_single_ticker(item):
             '損切り価格',
             '利確価格',
             '損益金額',
-            '損益率[%]',
+            '損益率',
             '手数料',
             '新規建日時',
             '決済日時',

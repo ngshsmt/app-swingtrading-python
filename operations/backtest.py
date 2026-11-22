@@ -307,7 +307,7 @@ def process_single_ticker(item):
         # -------------------------------------------------------------
         win_rate = float(stats['Win Rate [%]']) if pd.notnull(stats['Win Rate [%]']) else 0.0
 
-        # 平均利益[%]・平均損失[%]の計算
+        # 平均利益・平均損失の計算
         winning_returns = trades['損益率'][trades['損益率'] > 0]
         losing_returns = trades['損益率'][trades['損益率'] < 0]
 

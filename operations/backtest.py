@@ -254,7 +254,7 @@ def process_single_ticker(item):
             if col in trades.columns:
                 trades[col] = pd.to_datetime(trades[col]).dt.strftime('%Y-%m-%d %H:%M')
 
-        # 3. 損益率[%] の100倍換算
+        # 3. 損益率の小数点以下4桁に丸める（存在する場合のみ）
         if 'ReturnPct' in trades.columns:
             trades['ReturnPct'] = (trades['ReturnPct'] ).round(4)
 
@@ -308,8 +308,8 @@ def process_single_ticker(item):
         win_rate = float(stats['Win Rate [%]']) if pd.notnull(stats['Win Rate [%]']) else 0.0
 
         # 平均利益[%]・平均損失[%]の計算
-        winning_returns = trades['損益率[%]'][trades['損益率[%]'] > 0]
-        losing_returns = trades['損益率[%]'][trades['損益率[%]'] < 0]
+        winning_returns = trades['損益率'][trades['損益率'] > 0]
+        losing_returns = trades['損益率'][trades['損益率'] < 0]
 
         avg_gain_pct = float(winning_returns.mean()) if len(winning_returns) > 0 else 0.0
         avg_loss_pct = float(abs(losing_returns.mean())) if len(losing_returns) > 0 else 0.0

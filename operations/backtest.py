@@ -10,7 +10,9 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 from backtesting import Backtest, Strategy
+from dotenv import load_dotenv
 
+load_dotenv()
 SAVE_PATH = os.environ.get("SAVE_PATH")
 
 # リポジトリのルート階層をパスに追加（operations/ 配下から core/ を import するため）

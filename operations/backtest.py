@@ -374,7 +374,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     WATCHLIST_PATH = ROOT_DIR / "data" / "watchlist_jpx400.csv"
-    OUTPUT_DIR = Path(SAVE_PATH)
+    OUTPUT_DIR = Path(SAVE_PATH) if SAVE_PATH else ROOT_DIR / "SAVE_PATH"
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # 取得期間の設定

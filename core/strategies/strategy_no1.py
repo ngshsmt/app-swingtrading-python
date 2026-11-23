@@ -1,4 +1,4 @@
-# strategy_no1
+# strategy_no1（買いと空売りの条件はそれぞれ反転されたもの）
 # 旧`strategy.py`　前半の売買条件のみ残し、後半の条件に基づく状態管理は`generate_signals`へ移行した
 
 import numpy as np
@@ -25,7 +25,9 @@ def evaluate_conditions(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     # 転換・クロス条件（買い）
+    # 1. SupertrendがSell(1)からBuy(-1)に転換した日
     df["st_turn_buy"] = (df["ST_Direction"].shift(1) == 1) & (df["ST_Direction"] == -1)
+    # 2. SMA5がSMA10をゴールデンクロスした日
     df["sma_cross_buy"] = (df["SMA5"].shift(1) <= df["SMA10"].shift(1)) & (
         df["SMA5"] > df["SMA10"]
     )
@@ -44,12 +46,14 @@ def evaluate_conditions(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     # 転換・クロス条件（空売り）
+    # 1. SupertrendがBuy(-1)からSell(1)に転換した日
     df["st_turn_sell"] = (df["ST_Direction"].shift(1) == -1) & (df["ST_Direction"] == 1)
+    # 2. SMA5がSMA10をデッドクロスした日
     df["sma_cross_sell"] = (df["SMA5"].shift(1) >= df["SMA10"].shift(1)) & (
         df["SMA5"] < df["SMA10"]
     )
 
-    # 空売りエントリー / 手仕舞い条件（ベースライン：完全ミラー）
+    # 空売りエントリー / 手仕舞い条件
     df["shortEntryCond"] = (
         df["isStSell"]
         & df["isSimpleInversePO"]

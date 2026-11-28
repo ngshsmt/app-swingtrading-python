@@ -420,18 +420,26 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--strategy", default="strategy_no1", choices=list(STRATEGIES.keys()))
     parser.add_argument("--mode", default="short_only", choices=["both", "long_only", "short_only"])
+    parser.add_argument("--start", default=None, help="開始日 (YYYY-MM-DD)")
+    parser.add_argument("--end", default=None, help="終了日 (YYYY-MM-DD)")
+    parser.add_argument("--period", default=None, help="期間 (例: 5y)")
     args = parser.parse_args()
 
     WATCHLIST_PATH = ROOT_DIR / "data" / "watchlist_jpx400.csv"
     OUTPUT_DIR = Path(SAVE_PATH)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    # 取得期間の設定
-    # 変動させたい場合 FETCH_PERIOD = "5y"←直近5年を見る場合, START_DATE = None, END_DATE = None
-    # 固定させたい場合は下記の通り
-    FETCH_PERIOD = None
-    START_DATE = "2021-09-01"
-    END_DATE = "2021-09-01"
+    # 取得期間の設定（コマンドライン引数があれば優先、なければデフォルト値を使用）
+    FETCH_PERIOD = args.period if args.period else None
+    START_DATE = args.start if args.start else "2021-09-01"
+    END_DATE = args.end if args.end else "2026-08-31"
+
+    # 日付設定のバリデーション
+    if START_DATE and END_DATE and START_DATE >= END_DATE:
+        raise ValueError(
+            f"エラー: START_DATE ({START_DATE}) が END_DATE ({END_DATE}) 以上になっています。"
+            "開始日は終了日より前の日付を指定してください。"
+        )
 
     watchlist_items = load_watchlist_with_names(WATCHLIST_PATH)
 

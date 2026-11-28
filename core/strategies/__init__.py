@@ -1,13 +1,14 @@
 # 今後 strategy_no2.py を増やした際は、①`from core.strategies import`以降に追加分を、②STRATEGIES 辞書に1行足す
 
 import pandas as pd
-from core.strategies import strategy_no1, strategy_no2, strategy_no3
+from core.strategies import strategy_no1, strategy_no2, strategy_no3, strategy_no4
 from core.strategies.generate_signals import generate_signals
 
 STRATEGIES = {
     "strategy_no1": strategy_no1.evaluate_conditions,
     "strategy_no2": strategy_no2.evaluate_conditions,
     "strategy_no3": strategy_no3.evaluate_conditions,
+    "strategy_no4": strategy_no4.evaluate_conditions,
 }
 
 

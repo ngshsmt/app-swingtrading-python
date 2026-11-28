@@ -152,9 +152,13 @@ class CustomSignalStrategy(Strategy):
 def process_single_ticker(item):
     """
     yfinance経由で株価データを取得し、バックテストを実行
-    item: tuple (code, company_name, period, start_date, end_date)
+    item: tuple (code, company_name, period, start_date, end_date, strategy_name, mode, n225_df)
     """
-    code, company_name, period, start_date, end_date, strategy_name, mode = item
+    if len(item) == 8:
+        code, company_name, period, start_date, end_date, strategy_name, mode, n225_df = item
+    else:
+        code, company_name, period, start_date, end_date, strategy_name, mode = item
+        n225_df = None
     
     # 日本株対応用ティッカーシンボル (例: 1662 -> 1662.T)
     ticker_symbol = f"{code}.T" if not str(code).endswith('.T') else str(code)
@@ -184,6 +188,14 @@ def process_single_ticker(item):
             df['Volume'] = 0
 
         df = df[['Open', 'High', 'Low', 'Close', 'Volume']].dropna()
+
+        # タイムゾーンを除去して日経平均データ等と結合可能にする
+        if hasattr(df.index, 'tz') and df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
+
+        # 日経平均データが存在する場合は終値を結合
+        if n225_df is not None and not n225_df.empty and 'Close' in n225_df.columns:
+            df['N225_Close'] = n225_df['Close'].reindex(df.index).ffill()
 
         # データが削られた結果、件数が減った場合の再チェック
         if len(df) < 60:
@@ -402,6 +414,7 @@ def process_single_ticker(item):
 import datetime
 import os
 from core.loader import load_watchlist_with_names
+from core.nikkei225 import fetch_nikkei225
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -422,8 +435,15 @@ if __name__ == '__main__':
 
     watchlist_items = load_watchlist_with_names(WATCHLIST_PATH)
 
+    print("日経平均株価データ（^N225）を取得中...")
+    n225_df = fetch_nikkei225(start_date=START_DATE, end_date=END_DATE, period=FETCH_PERIOD)
+    if n225_df.empty:
+        print("[警告] 日経平均データの取得に失敗しました。地合いフィルターはスキップ（常に有効扱い）されます。")
+    else:
+        print(f"日経平均データを正常に取得しました（{len(n225_df)} 件）。")
+
     tasks = [
-        (code, company_name, FETCH_PERIOD, START_DATE, END_DATE, args.strategy, args.mode)
+        (code, company_name, FETCH_PERIOD, START_DATE, END_DATE, args.strategy, args.mode, n225_df)
         for code, company_name in watchlist_items
     ]
 

@@ -430,7 +430,7 @@ if __name__ == '__main__':
     # 変動させたい場合 FETCH_PERIOD = "5y"←直近5年を見る場合, START_DATE = None, END_DATE = None
     # 固定させたい場合は下記の通り
     FETCH_PERIOD = None
-    START_DATE = "2016-09-01"
+    START_DATE = "2021-09-01"
     END_DATE = "2021-09-01"
 
     watchlist_items = load_watchlist_with_names(WATCHLIST_PATH)
